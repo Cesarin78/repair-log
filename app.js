@@ -669,6 +669,7 @@
     $('#indoorTemp').value = photo.indoorF != null ? photo.indoorF : '';
     setTool(ed.tool); setColor(ed.color);
     showScreen('editor', which === 'before' ? 3 : 4);
+        requestAnimationFrame(fitPhotoOnScreen);
     updateWeatherUI(); redraw();
   }
   function closeEditor() { Object.assign(ed, { repair: null, which: null, photo: null, base: null, preview: null }); ed.cache.clear(); }
@@ -716,6 +717,13 @@
     const r = canvas.getBoundingClientRect();
     const clamp = v => Math.min(1, Math.max(0, v));
     return { x: clamp((e.clientX - r.left) / r.width), y: clamp((e.clientY - r.top) / r.height) };
+  }
+    // Scrolls just enough so the bottom of the photo isn't hidden behind
+  // the phone browser's address bar (Safari puts it over the bottom).
+  function fitPhotoOnScreen() {
+    const rect = canvas.getBoundingClientRect();
+    const visible = (window.visualViewport ? window.visualViewport.height : window.innerHeight) - 100;
+    if (rect.bottom > visible) window.scrollBy(0, rect.bottom - visible);
   }
   // Where the unit badge is right now on the editor canvas (in pixels)
   function currentBadge() {
