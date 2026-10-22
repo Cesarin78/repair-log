@@ -1,0 +1,165 @@
+<!doctype html>
+<!-- =====================================================================
+     index.html  —  THE STRUCTURE (what is on each screen)
+     The app has 4 screens. Only one is visible at a time:
+       1. screen-home    : list of repairs + "New repair" button
+       2. screen-form    : floor, unit, location, code
+       3. screen-editor  : the photo with arrows, text and close-ups
+       4. screen-detail  : one repair with its start/end photos
+     ===================================================================== -->
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#151515">
+  <title>Registro de Reparaciones</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <!-- Top bar: app name + language button -->
+  <header class="topbar">
+    <h1 data-i18n="appTitle"></h1>
+    <button id="langBtn" class="lang-btn" type="button">English</button>
+  </header>
+
+  <!-- The step list (1 Info, 2 Start photo, ...) — filled in by app.js -->
+  <nav id="stepper" class="stepper hidden"></nav>
+
+  <main>
+
+    <!-- ========== SCREEN 1: HOME ========== -->
+    <section id="screen-home" class="screen">
+      <button id="newBtn" class="btn primary big" type="button">＋ <span data-i18n="newRepair"></span></button>
+
+      <details class="howto">
+        <summary data-i18n="howTo"></summary>
+        <ol id="howtoList"></ol>
+      </details>
+
+      <div id="filters" class="chips"></div>
+      <div id="repairList"></div>
+
+      <div class="row2">
+        <button id="csvBtn" class="btn" type="button" data-i18n="exportCsv"></button>
+        <button id="settingsBtn" class="btn" type="button" data-i18n="settings"></button>
+      </div>
+      <p class="note" data-i18n="localNote"></p>
+    </section>
+
+    <!-- ========== SCREEN 2: FORM ========== -->
+    <section id="screen-form" class="screen hidden">
+      <button id="voiceFillBtn" class="btn voice big" type="button">🎤 <span data-i18n="sayInfo"></span></button>
+      <p class="hint" data-i18n="sayInfoHint"></p>
+
+      <label class="field"><span data-i18n="floor"></span>
+        <input id="fFloor" inputmode="numeric" autocomplete="off">
+      </label>
+
+      <label class="field"><span data-i18n="unit"></span> *
+        <input id="fUnit" autocomplete="off" autocapitalize="characters">
+      </label>
+
+      <div class="field">
+        <label for="fLocation" data-i18n="location"></label>
+        <div class="with-mic">
+          <input id="fLocation" list="locList" autocomplete="off" data-i18n-ph="locationPh">
+          <button class="mic" type="button" data-mic="fLocation" aria-label="Dictate">🎤</button>
+        </div>
+      </div>
+
+      <div class="field">
+        <label for="fArea" data-i18n="areaTag"></label>
+        <div class="with-mic">
+          <input id="fArea" autocomplete="off" autocapitalize="characters" data-i18n-ph="areaPh">
+          <button class="mic" type="button" data-mic="fArea" data-transform="tag" aria-label="Dictate">🎤</button>
+        </div>
+      </div>
+
+      <label class="field"><span data-i18n="code"></span> *
+        <select id="fCode"></select>
+      </label>
+
+      <button id="takeBeforeBtn" class="btn primary big" type="button">📷 <span data-i18n="takeStart"></span></button>
+      <button id="galleryBeforeBtn" class="link" type="button" data-i18n="orGallery"></button>
+      <button id="cancelFormBtn" class="btn ghost" type="button" data-i18n="cancel"></button>
+    </section>
+
+    <!-- ========== SCREEN 3: PHOTO EDITOR ========== -->
+    <section id="screen-editor" class="screen hidden">
+      <div class="toolbar">
+        <button class="tool" type="button" data-tool="arrow">➜<br><span data-i18n="toolArrow"></span></button>
+        <button class="tool" type="button" data-tool="text">T<br><span data-i18n="toolText"></span></button>
+        <button class="tool" type="button" data-tool="closeup">◎<br><span data-i18n="toolClose"></span></button>
+        <button id="undoBtn" class="tool" type="button">↩<br><span data-i18n="undo"></span></button>
+      </div>
+      <div class="colors">
+        <button class="swatch" type="button" data-color="#FFE600" style="background:#FFE600" aria-label="yellow"></button>
+        <button class="swatch" type="button" data-color="#3EC6FF" style="background:#3EC6FF" aria-label="blue"></button>
+        <button class="swatch" type="button" data-color="#FF3B30" style="background:#FF3B30" aria-label="red"></button>
+        <button class="swatch" type="button" data-color="#FFFFFF" style="background:#FFFFFF" aria-label="white"></button>
+        <button class="swatch" type="button" data-color="#111111" style="background:#111111" aria-label="black"></button>
+      </div>
+      <p id="toolHint" class="hint"></p>
+
+      <div class="canvas-wrap"><canvas id="canvas"></canvas></div>
+
+      <p class="weather-row"><span id="weatherStatus"></span>
+        <button id="weatherRetry" class="link hidden" type="button" data-i18n="retry"></button>
+      </p>
+      <label class="field"><span data-i18n="indoorTemp"></span>
+        <input id="indoorTemp" type="number" inputmode="decimal" step="1">
+      </label>
+      <p class="hint" data-i18n="indoorHint"></p>
+
+      <button id="saveEditorBtn" class="btn primary big" type="button" data-i18n="save"></button>
+      <button id="cancelEditorBtn" class="btn ghost" type="button" data-i18n="cancel"></button>
+    </section>
+
+    <!-- ========== SCREEN 4: ONE REPAIR ========== -->
+    <section id="screen-detail" class="screen hidden">
+      <div id="detailBody"></div>
+    </section>
+
+  </main>
+
+  <!-- Pop-up for writing an instruction on the photo -->
+  <div id="textModal" class="modal hidden">
+    <div class="modal-box">
+      <h3 data-i18n="textTitle"></h3>
+      <textarea id="textInput" rows="3" data-i18n-ph="textPh"></textarea>
+      <button class="btn voice" type="button" data-mic="textInput" data-mode="append"><span data-i18n="dictate"></span></button>
+      <div class="row2">
+        <button id="textCancel" class="btn ghost" type="button" data-i18n="cancel"></button>
+        <button id="textOk" class="btn primary" type="button" data-i18n="ok"></button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Pop-up for settings -->
+  <div id="settingsModal" class="modal hidden">
+    <div class="modal-box">
+      <h3 data-i18n="settings"></h3>
+      <label class="field"><span data-i18n="gcName"></span>
+        <input id="sGc" autocomplete="off">
+      </label>
+      <p class="hint" data-i18n="gcHint"></p>
+      <button id="sSave" class="btn primary" type="button" data-i18n="save"></button>
+      <button id="sClose" class="btn ghost" type="button" data-i18n="close"></button>
+    </div>
+  </div>
+
+  <!-- Small message that pops up at the bottom -->
+  <div id="toast" class="toast hidden" role="status"></div>
+
+  <!-- Hidden camera buttons (the app "clicks" these for you) -->
+  <input type="file" id="camMain" accept="image/*" capture="environment" hidden>
+  <input type="file" id="galleryMain" accept="image/*" hidden>
+  <input type="file" id="camClose" accept="image/*" capture="environment" hidden>
+
+  <datalist id="locList"></datalist>
+
+  <script src="codes.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>
