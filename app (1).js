@@ -58,7 +58,10 @@
       hintArrow: 'Arrastra el dedo desde donde empieza la flecha hasta el punto que quieres señalar.',
       hintText: 'Toca la foto donde quieres poner la instrucción.',
       hintClose: 'Toca donde quieres el círculo y toma una foto de cerca del detalle.',
-      badgeHint: 'Arrastra el número de unidad (borde punteado) para ponerlo junto a la flecha.',
+      hintMove: 'Arrastra el número de unidad (borde punteado) a donde lo quieras.',
+      hintNone: 'Elige una herramienta para marcar la foto. Tócala otra vez para apagarla y poder desplazarte.',
+      toolMove: 'Mover',
+      badgeHint: 'Para mover el número de unidad, toca "Mover".',
       badgeCorner: '↙ Regresar número de unidad a la esquina',
       textTitle: 'Escribe o dicta la instrucción', textPh: 'Ej. Forrar cajón',
       dictate: '🎤 Dictar', ok: 'Agregar',
@@ -121,7 +124,10 @@
       hintArrow: 'Drag your finger from where the arrow starts to the spot you want to point at.',
       hintText: 'Tap the photo where you want the instruction.',
       hintClose: 'Tap where you want the circle, then take a close-up photo of the detail.',
-      badgeHint: 'Drag the unit number (dashed border) to place it next to the arrow.',
+      hintMove: 'Drag the unit number (dashed border) wherever you want it.',
+      hintNone: 'Pick a tool to mark up the photo. Tap it again to turn it off so you can scroll.',
+      toolMove: 'Move',
+      badgeHint: 'To move the unit number, tap "Move".',
       badgeCorner: '↙ Move unit number back to the corner',
       textTitle: 'Type or dictate the instruction', textPh: 'e.g. Wrap the soffit',
       dictate: '🎤 Dictate', ok: 'Add',
@@ -656,7 +662,7 @@
   // ---------- EDITOR ----------
   const canvas = $('#canvas'), ctx = canvas.getContext('2d');
   const ed = { repair: null, which: null, photo: null, base: null, cache: new Map(),
-               tool: 'arrow', color: '#FFE600', down: null, preview: null, drag: null };
+               tool: null, color: '#FFE600', down: null, preview: null, drag: null };
 
   function redraw() {
     if (!ed.base) return;
@@ -667,16 +673,20 @@
     ed.base = await blobToImg(photo.blob);
     canvas.width = photo.w; canvas.height = photo.h;
     $('#indoorTemp').value = photo.indoorF != null ? photo.indoorF : '';
-    setTool(ed.tool); setColor(ed.color);
+    setTool(null); setColor(ed.color);   // every new photo starts with no tool selected
     showScreen('editor', which === 'before' ? 3 : 4);
         requestAnimationFrame(fitPhotoOnScreen);
     updateWeatherUI(); redraw();
   }
   function closeEditor() { Object.assign(ed, { repair: null, which: null, photo: null, base: null, preview: null }); ed.cache.clear(); }
+  // tool = 'arrow' | 'text' | 'closeup' | 'move', or null for "no tool" (scrolling)
   function setTool(tool) {
-    ed.tool = tool;
-    $$('.tool[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === tool));
-    $('#toolHint').textContent = t({ arrow: 'hintArrow', text: 'hintText', closeup: 'hintClose' }[tool]);
+    ed.tool = tool || null;
+    $$('.tool[data-tool]').forEach(b => b.classList.toggle('active', b.dataset.tool === ed.tool));
+    // With a tool on, the photo catches your finger; with no tool, the page scrolls
+    canvas.style.touchAction = ed.tool ? 'none' : 'auto';
+    const hints = { arrow: 'hintArrow', text: 'hintText', closeup: 'hintClose', move: 'hintMove' };
+    $('#toolHint').textContent = t(hints[ed.tool] || 'hintNone');
   }
   function setColor(c) {
     ed.color = c;
@@ -985,7 +995,8 @@
     };
 
     // Editor tools
-    $$('.tool[data-tool]').forEach(b => { b.onclick = () => setTool(b.dataset.tool); });
+    // Tap a tool to turn it on; tap it again to turn it off
+    $$('.tool[data-tool]').forEach(b => { b.onclick = () => setTool(ed.tool === b.dataset.tool ? null : b.dataset.tool); });
     $$('.swatch').forEach(b => { b.onclick = () => setColor(b.dataset.color); });
     $('#undoBtn').onclick = () => {
       if (!ed.photo) return;
@@ -1005,15 +1016,20 @@
 
     // Drawing with your finger
     canvas.addEventListener('pointerdown', e => {
-      if (!ed.photo) return;
+      // No tool selected = do nothing, so the finger scrolls the page normally
+      if (!ed.photo || !ed.tool) return;
       e.preventDefault();
       try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
       const p = pointOf(e);
       ed.down = p;
-      // Touching the unit badge always moves it, whatever tool is selected
-      if (onBadge(p)) {
-        const b = currentBadge();
-        ed.drag = { dx: p.x * canvas.width - (b.x + b.w / 2), dy: p.y * canvas.height - (b.y + b.h / 2) };
+      // "Move" tool: only the unit badge can be dragged
+      if (ed.tool === 'move') {
+        if (onBadge(p)) {
+          const b = currentBadge();
+          ed.drag = { dx: p.x * canvas.width - (b.x + b.w / 2), dy: p.y * canvas.height - (b.y + b.h / 2) };
+        } else {
+          ed.down = null;
+        }
         return;
       }
       if (ed.tool === 'arrow') ed.preview = { type: 'arrow', x1: p.x, y1: p.y, x2: p.x, y2: p.y, color: ed.color };

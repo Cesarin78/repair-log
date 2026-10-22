@@ -132,9 +132,9 @@ input, select, textarea {
 .pill.done { background: #d3f5dc; color: #0f5323; }
 
 /* ---------- Editor ---------- */
-.toolbar { display: grid; grid-template-columns: repeat(4, 1fr); gap: 6px; }
+.toolbar { display: grid; grid-template-columns: repeat(5, 1fr); gap: 5px; }
 .tool {
-  padding: 8px 4px; font-size: 14px; line-height: 1.3;
+  padding: 8px 2px; font-size: 13px; line-height: 1.3;
   border-radius: 10px; border: 1px solid var(--line);
   background: var(--card); color: var(--ink);
 }
