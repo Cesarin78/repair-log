@@ -20,7 +20,8 @@
   <!-- Top bar: app name + language button -->
   <header class="topbar">
     <h1 data-i18n="appTitle"></h1>
-    <button id="langBtn" class="lang-btn" type="button">English</button>
+    <!-- Shows the language in use right now. Tapping it switches language. -->
+    <button id="langBtn" class="lang-btn" type="button" aria-label="Cambiar idioma / Change language">🌐 Español</button>
   </header>
 
   <!-- The step list (1 Info, 2 Start photo, ...) — filled in by app.js -->
@@ -101,8 +102,10 @@
         <button class="swatch" type="button" data-color="#111111" style="background:#111111" aria-label="black"></button>
       </div>
       <p id="toolHint" class="hint"></p>
+      <p class="hint" data-i18n="badgeHint"></p>
 
       <div class="canvas-wrap"><canvas id="canvas"></canvas></div>
+      <button id="badgeCornerBtn" class="link" type="button" data-i18n="badgeCorner"></button>
 
       <p class="weather-row"><span id="weatherStatus"></span>
         <button id="weatherRetry" class="link hidden" type="button" data-i18n="retry"></button>

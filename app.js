@@ -58,6 +58,8 @@
       hintArrow: 'Arrastra el dedo desde donde empieza la flecha hasta el punto que quieres señalar.',
       hintText: 'Toca la foto donde quieres poner la instrucción.',
       hintClose: 'Toca donde quieres el círculo y toma una foto de cerca del detalle.',
+      badgeHint: 'Arrastra el número de unidad (borde punteado) para ponerlo junto a la flecha.',
+      badgeCorner: '↙ Regresar número de unidad a la esquina',
       textTitle: 'Escribe o dicta la instrucción', textPh: 'Ej. Forrar cajón',
       dictate: '🎤 Dictar', ok: 'Agregar',
       weatherLoading: 'Obteniendo clima…',
@@ -119,6 +121,8 @@
       hintArrow: 'Drag your finger from where the arrow starts to the spot you want to point at.',
       hintText: 'Tap the photo where you want the instruction.',
       hintClose: 'Tap where you want the circle, then take a close-up photo of the detail.',
+      badgeHint: 'Drag the unit number (dashed border) to place it next to the arrow.',
+      badgeCorner: '↙ Move unit number back to the corner',
       textTitle: 'Type or dictate the instruction', textPh: 'e.g. Wrap the soffit',
       dictate: '🎤 Dictate', ok: 'Add',
       weatherLoading: 'Getting weather…',
@@ -403,21 +407,39 @@
     ctx.lineWidth = 10 * s; ctx.strokeStyle = color; ctx.stroke();
   }
 
-  // Big yellow unit number in the bottom-left corner (like the client's photos)
-  function drawBadge(ctx, r, s, W, H) {
+  // Big yellow unit number (like the client's photos).
+  // It starts in the bottom-left corner. If the user drags it, its new
+  // center is saved in photo.badge as fractions ({ x: 0–1, y: 0–1 }).
+  function badgeLayout(ctx, r, p, s, W, H) {
     const text = [r.unit, r.location].filter(Boolean).join(' ');
-    if (!text) return;
+    if (!text) return null;
     let fs = 78 * s;
     ctx.font = font(fs, true);
     const maxW = W * 0.9 - 40 * s;
     let tw = ctx.measureText(text).width;
     if (tw > maxW) { fs *= maxW / tw; ctx.font = font(fs, true); tw = ctx.measureText(text).width; }
     const padX = fs * 0.35, padY = fs * 0.2, h = fs + padY * 2, w = tw + padX * 2, m = 20 * s;
-    const x = m, y = H - h - m;
+    let x = m, y = H - h - m;                       // default: bottom-left corner
+    if (p && p.badge) { x = p.badge.x * W - w / 2; y = p.badge.y * H - h / 2; }
+    x = Math.min(Math.max(x, 0), W - w);            // keep it inside the photo
+    y = Math.min(Math.max(y, 0), H - h);
+    return { text, fs, padX, x, y, w, h };
+  }
+  function drawBadge(ctx, r, p, s, W, H, live) {
+    const b = badgeLayout(ctx, r, p, s, W, H);
+    if (!b) return;
     ctx.fillStyle = 'rgba(0,0,0,0.88)';
-    roundRect(ctx, x, y, w, h, h * 0.3); ctx.fill();
+    roundRect(ctx, b.x, b.y, b.w, b.h, b.h * 0.3); ctx.fill();
+    ctx.font = font(b.fs, true);
     ctx.fillStyle = '#FFE600'; ctx.textBaseline = 'middle';
-    ctx.fillText(text, x + padX, y + h / 2 + fs * 0.04);
+    ctx.fillText(b.text, b.x + b.padX, b.y + b.h / 2 + b.fs * 0.04);
+    if (live) {
+      // Dashed outline only while editing, to show it can be dragged
+      ctx.save();
+      ctx.setLineDash([14 * s, 10 * s]); ctx.lineWidth = 4 * s; ctx.strokeStyle = '#FFE600';
+      roundRect(ctx, b.x - 6 * s, b.y - 6 * s, b.w + 12 * s, b.h + 12 * s, b.h * 0.35); ctx.stroke();
+      ctx.restore();
+    }
   }
 
   // The lines in the small info box (top-right corner)
@@ -483,7 +505,7 @@
     for (const a of anns) if (a.type === 'closeup' && cache.get(a.id)) drawCloseup(ctx, cache.get(a.id), a.x * W, a.y * H, s, W, H, a.color);
     for (const a of anns) if (a.type === 'arrow') drawArrow(ctx, a.x1 * W, a.y1 * H, a.x2 * W, a.y2 * H, a.color, s);
     for (const a of anns) if (a.type === 'text') drawLabel(ctx, a.text, a.x * W, a.y * H, s, W, H);
-    drawBadge(ctx, r, s, W, H);
+    drawBadge(ctx, r, p, s, W, H, live);
     drawInfo(ctx, r, which, p, s, W, live);
   }
 
@@ -634,14 +656,14 @@
   // ---------- EDITOR ----------
   const canvas = $('#canvas'), ctx = canvas.getContext('2d');
   const ed = { repair: null, which: null, photo: null, base: null, cache: new Map(),
-               tool: 'arrow', color: '#FFE600', down: null, preview: null };
+               tool: 'arrow', color: '#FFE600', down: null, preview: null, drag: null };
 
   function redraw() {
     if (!ed.base) return;
     drawScene(ctx, canvas.width, canvas.height, ed.base, ed.photo, ed.repair, ed.which, ed.cache, ed.preview, true);
   }
   async function openEditor(repair, which, photo) {
-    Object.assign(ed, { repair, which, photo, preview: null, down: null, cache: new Map() });
+    Object.assign(ed, { repair, which, photo, preview: null, down: null, drag: null, cache: new Map() });
     ed.base = await blobToImg(photo.blob);
     canvas.width = photo.w; canvas.height = photo.h;
     $('#indoorTemp').value = photo.indoorF != null ? photo.indoorF : '';
@@ -694,6 +716,18 @@
     const r = canvas.getBoundingClientRect();
     const clamp = v => Math.min(1, Math.max(0, v));
     return { x: clamp((e.clientX - r.left) / r.width), y: clamp((e.clientY - r.top) / r.height) };
+  }
+  // Where the unit badge is right now on the editor canvas (in pixels)
+  function currentBadge() {
+    const W = canvas.width, H = canvas.height;
+    return badgeLayout(ctx, ed.repair, ed.photo, Math.min(W, H) / 1000, W, H);
+  }
+  // Did the finger land on the unit badge? (a little extra room makes it easier to grab)
+  function onBadge(p) {
+    const b = currentBadge();
+    if (!b) return false;
+    const x = p.x * canvas.width, y = p.y * canvas.height, extra = 20 * Math.min(canvas.width, canvas.height) / 1000;
+    return x >= b.x - extra && x <= b.x + b.w + extra && y >= b.y - extra && y <= b.y + b.h + extra;
   }
   async function saveEditor() {
     const r = ed.repair, p = ed.photo, which = ed.which;
@@ -881,7 +915,8 @@
     document.title = t('appTitle');
     $$('[data-i18n]').forEach(n => { n.textContent = t(n.dataset.i18n); });
     $$('[data-i18n-ph]').forEach(n => { n.placeholder = t(n.dataset.i18nPh); });
-    $('#langBtn').textContent = settings.lang === 'es' ? 'English' : 'Español';
+    // The button shows the language the app is using right now. Tap it to switch.
+    $('#langBtn').textContent = settings.lang === 'es' ? '🌐 Español' : '🌐 English';
     const ol = $('#howtoList'); ol.innerHTML = '';
     t('howToSteps').forEach(s => ol.append(el('li', {}, s)));
     buildCodeSelect(); buildLocations();
@@ -967,9 +1002,23 @@
       try { canvas.setPointerCapture(e.pointerId); } catch (_) { /* ignore */ }
       const p = pointOf(e);
       ed.down = p;
+      // Touching the unit badge always moves it, whatever tool is selected
+      if (onBadge(p)) {
+        const b = currentBadge();
+        ed.drag = { dx: p.x * canvas.width - (b.x + b.w / 2), dy: p.y * canvas.height - (b.y + b.h / 2) };
+        return;
+      }
       if (ed.tool === 'arrow') ed.preview = { type: 'arrow', x1: p.x, y1: p.y, x2: p.x, y2: p.y, color: ed.color };
     });
     canvas.addEventListener('pointermove', e => {
+      if (ed.drag) {
+        const p = pointOf(e), W = canvas.width, H = canvas.height;
+        ed.photo.badge = { x: (p.x * W - ed.drag.dx) / W, y: (p.y * H - ed.drag.dy) / H };
+        const b = currentBadge();                      // save the position after keeping it inside the photo
+        ed.photo.badge = { x: (b.x + b.w / 2) / W, y: (b.y + b.h / 2) / H };
+        redraw();
+        return;
+      }
       if (!ed.down || ed.tool !== 'arrow' || !ed.preview) return;
       const p = pointOf(e);
       ed.preview.x2 = p.x; ed.preview.y2 = p.y;
@@ -978,6 +1027,7 @@
     canvas.addEventListener('pointerup', e => {
       if (!ed.down) return;
       ed.down = null;
+      if (ed.drag) { ed.drag = null; redraw(); return; }
       const p = pointOf(e);
       if (ed.tool === 'arrow') {
         const a = ed.preview; ed.preview = null;
@@ -992,7 +1042,8 @@
         $('#camClose').click();
       }
     });
-    canvas.addEventListener('pointercancel', () => { ed.down = null; ed.preview = null; redraw(); });
+    canvas.addEventListener('pointercancel', () => { ed.down = null; ed.preview = null; ed.drag = null; redraw(); });
+    $('#badgeCornerBtn').onclick = () => { if (ed.photo) { ed.photo.badge = null; redraw(); } };
 
     // Text pop-up
     $('#textOk').onclick = () => {
