@@ -142,13 +142,13 @@ input, select, textarea {
 .colors { display: flex; gap: 12px; margin: 10px 0 4px; }
 .swatch { width: 38px; height: 38px; border-radius: 50%; border: 2px solid var(--line); }
 .swatch.active { outline: 3px solid var(--blue); outline-offset: 2px; }
-.canv.canvas-wrap { margin: 8px -16px; background: #000; display: flex; justify-content: center; }
+.canvas-wrap { margin: 8px -16px; background: #000; display: flex; justify-content: center; }
 canvas {
   display: block; width: auto; height: auto; max-width: 100%;
   max-height: calc(100vh - 200px);   /* keeps the whole photo on the screen */
   touch-action: none;
 }
-canvas { display: block; width: 100%; height: auto; touch-action: none; }
+
 .weather-row { font-size: 15px; }
 
 /* ---------- Detail ---------- */
